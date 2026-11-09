@@ -1,0 +1,46 @@
+name: xueqiu-watch
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # 每 30 分钟运行一次
+  workflow_dispatch: {} # 允许手动触发（更新 Cookie 后可立即测试）
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: xueqiu-watch
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 避免拿到的分支落后导致快照回滚
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 拉取自选股并比对
+        env:
+          XUEQIU_COOKIE: ${{ secrets.XUEQIU_COOKIE }}
+          SENDKEY: ${{ secrets.SENDKEY }}
+          TARGET_UID: "7143769715"
+          SNAPSHOT_FILE: snapshot.json
+        run: node index.mjs
+
+      - name: 提交快照
+        run: |
+          git config user.name "xueqiu-watch-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add snapshot.json
+          if git diff --cached --quiet; then
+            echo "快照无变化，跳过提交"
+          else
+            git commit -m "chore: 更新自选股快照 [skip ci]"
+            git pull --rebase origin "${GITHUB_REF#refs/heads/}" || true
+            git push
+          fi
