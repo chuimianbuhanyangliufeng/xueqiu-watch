@@ -176,18 +176,26 @@ async function main() {
     }
   }
 
-  if (added.length === 0 && removed.length === 0) {
-    console.log("自选股无变动");
+  if (added.length === 0) {
+    if (removed.length > 0) {
+      // 仅移除：静默更新快照，不推送
+      console.log(`移除 ${removed.length} 只（按要求不推送）: ${removed.join("、")}`);
+      writeFileSync(
+        SNAPSHOT_FILE,
+        JSON.stringify({ updatedAt: new Date().toISOString(), stocks: Object.fromEntries(nowMap) }, null, 2)
+      );
+    } else {
+      console.log("自选股无变动");
+    }
     return;
   }
 
-  const parts = [];
-  if (added.length) parts.push(`**➕ 新买入/加入（${added.length}）**\n\n${added.join("\n\n")}`);
-  if (removed.length) parts.push(`**➖ 移除/清仓（${removed.length}）**\n\n${removed.join("\n\n")}`);
+  const parts = [`**➕ 新买入/加入（${added.length}）**\n\n${added.join("\n\n")}`];
+  if (removed.length) parts.push(`（另有移除 ${removed.length} 只：${removed.join("、")}，仅作记录）`);
 
   await pushWeixin(
-    `自选股变动：新增${added.length} 移除${removed.length}`,
-    `【雪球用户 ${TARGET_UID}】默认自选股发生变动（共 ${nowMap.size} 只）：\n\n${parts.join("\n\n---\n\n")}`
+    `自选股变动：新增${added.length}`,
+    `【雪球用户 ${TARGET_UID}】默认自选股发生变动（现共 ${nowMap.size} 只）：\n\n${parts.join("\n\n---\n\n")}`
   );
 
   writeFileSync(
